@@ -48,6 +48,7 @@ flutter run
 
 - [Arquitetura](docs/arquitetura.md)
 - [Conformidade LGPD](docs/lgpd-compliance.md) — **leitura obrigatória** antes de contribuir (dados sensíveis de saúde)
+- [Setup do ambiente](docs/setup.md) — PostgreSQL, Redis, Whisper
 
 ## Segurança
 
