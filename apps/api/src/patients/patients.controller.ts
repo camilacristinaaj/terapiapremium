@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
   Request,
@@ -10,6 +12,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { UpdatePatientDto } from './dto/update-patient.dto';
 
 @Controller('patients')
 @UseGuards(AuthGuard('jwt'))
@@ -35,5 +38,22 @@ export class PatientsController {
     @Param('id') id: string,
   ) {
     return this.patientsService.findOne(id, req.user.sub);
+  }
+
+  @Patch(':id')
+  update(
+    @Request() req: { user: { sub: string } },
+    @Param('id') id: string,
+    @Body() dto: UpdatePatientDto,
+  ) {
+    return this.patientsService.update(id, req.user.sub, dto);
+  }
+
+  @Delete(':id')
+  remove(
+    @Request() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.patientsService.remove(id, req.user.sub);
   }
 }

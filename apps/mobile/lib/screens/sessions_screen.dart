@@ -14,13 +14,36 @@ class SessionsScreen extends StatefulWidget {
 
 class _SessionsScreenState extends State<SessionsScreen> {
   List<Session> _sessions = [];
+  List<Session> _filteredSessions = [];
   bool _loading = true;
   String? _error;
+  final _searchCtrl = TextEditingController();
+  String _filterStatus = 'ALL';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _filterSessions() {
+    final query = _searchCtrl.text.toLowerCase();
+    setState(() {
+      _filteredSessions = _sessions.where((s) {
+        final matchesQuery =
+            s.patientName.toLowerCase().contains(query) ||
+            (s.notes?.toLowerCase().contains(query) ?? false);
+        final matchesStatus =
+            _filterStatus == 'ALL' || s.status == _filterStatus;
+        return matchesQuery && matchesStatus;
+      }).toList();
+    });
   }
 
   Future<void> _load() async {
@@ -33,6 +56,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       final data = await api.get('/sessions');
       setState(() {
         _sessions = (data as List).map((j) => Session.fromJson(j)).toList();
+        _filteredSessions = _sessions;
         _loading = false;
       });
     } catch (e) {
@@ -55,46 +79,124 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text('Erro: $_error'))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: _sessions.isEmpty
-                      ? const Center(
-                          child: Text('Nenhuma sessão registrada'),
-                        )
-                      : ListView.builder(
-                          itemCount: _sessions.length,
-                          itemBuilder: (context, i) {
-                            final s = _sessions[i];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text(s.patientName[0].toUpperCase()),
-                                ),
-                                title: Text(s.patientName),
-                                subtitle: Text(
-                                  '${s.startedAt.day}/${s.startedAt.month}/${s.startedAt.year} '
-                                  '${s.startedAt.hour}:${s.startedAt.minute.toString().padLeft(2, '0')} • '
-                                  '${s.status}',
-                                ),
-                                trailing: s.status == 'COMPLETED'
-                                    ? const Icon(Icons.check_circle,
-                                        color: Colors.green)
-                                    : const Icon(Icons.mic, color: Colors.teal),
-                                onTap: () => _handleSessionTap(s),
-                                onLongPress: () => _showSessionOptions(s),
-                              ),
-                            );
-                          },
-                        ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por paciente ou notas...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              _filterSessions();
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => _filterSessions(),
                 ),
+                const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Todas'),
+                        selected: _filterStatus == 'ALL',
+                        onSelected: (_) {
+                          setState(() => _filterStatus = 'ALL');
+                          _filterSessions();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('Gravando'),
+                        selected: _filterStatus == 'RECORDING',
+                        onSelected: (_) {
+                          setState(() => _filterStatus = 'RECORDING');
+                          _filterSessions();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('Processando'),
+                        selected: _filterStatus == 'PROCESSING',
+                        onSelected: (_) {
+                          setState(() => _filterStatus = 'PROCESSING');
+                          _filterSessions();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('Concluídas'),
+                        selected: _filterStatus == 'COMPLETED',
+                        onSelected: (_) {
+                          setState(() => _filterStatus = 'COMPLETED');
+                          _filterSessions();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text('Erro: $_error'))
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: _filteredSessions.isEmpty
+                            ? Center(
+                                child: Text(
+                                  _sessions.isEmpty
+                                      ? 'Nenhuma sessão registrada'
+                                      : 'Nenhuma sessão encontrada',
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _filteredSessions.length,
+                                itemBuilder: (context, i) {
+                                  final s = _filteredSessions[i];
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        child: Text(s.patientName[0].toUpperCase()),
+                                      ),
+                                      title: Text(s.patientName),
+                                      subtitle: Text(
+                                        '${s.startedAt.day}/${s.startedAt.month}/${s.startedAt.year} '
+                                        '${s.startedAt.hour}:${s.startedAt.minute.toString().padLeft(2, '0')} • '
+                                        '${s.status}',
+                                      ),
+                                      trailing: s.status == 'COMPLETED'
+                                          ? const Icon(Icons.check_circle,
+                                              color: Colors.green)
+                                          : const Icon(Icons.mic, color: Colors.teal),
+                                      onTap: () => _handleSessionTap(s),
+                                      onLongPress: () => _showSessionOptions(s),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showNewSessionDialog(context),
         icon: const Icon(Icons.add),

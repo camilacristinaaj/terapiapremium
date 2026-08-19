@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
@@ -6,8 +6,11 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { EnableMfaDto } from './dto/enable-mfa.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
+import { randomBytes } from 'crypto';
 
 export interface JwtPayload {
   sub: string;
@@ -110,6 +113,59 @@ export class AuthService {
         secret: user.mfaSecret!,
       }),
     };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (!user) {
+      // Não revela se o email existe (segurança)
+      return { message: 'Se o email existir, enviaremos instruções' };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    // Em produção: enviar email com link
+    // await this.mailService.sendResetPassword(user.email, token);
+    console.log(`[DEV] Token de recuperação para ${user.email}: ${token}`);
+
+    return { message: 'Se o email existir, enviaremos instruções' };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token: dto.token },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.expiresAt < new Date() || resetToken.usedAt) {
+      throw new UnauthorizedException('Token inválido ou expirado');
+    }
+
+    const passwordHash = this.crypto.hashPassword(dto.newPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { message: 'Senha alterada com sucesso' };
   }
 
   private generateTokens(userId: string, email: string, role: string) {

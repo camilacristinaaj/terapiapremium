@@ -94,11 +94,127 @@ class _PatientsScreenState extends State<PatientsScreen> {
               Text(
                   'Nascimento: ${patient.birthDate!.day}/${patient.birthDate!.month}/${patient.birthDate!.year}'),
             const SizedBox(height: 16),
-            const Text('Ações disponíveis em breve: editar, ver sessões'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showEditDialog(patient);
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Editar'),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _confirmDelete(patient);
+                  },
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  label: const Text('Excluir',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _showEditDialog(Patient patient) {
+    final nameCtrl = TextEditingController(text: patient.fullName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar paciente'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Nome completo',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _updatePatient(patient.id, nameCtrl.text.trim());
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updatePatient(String id, String name) async {
+    try {
+      final api = context.read<AuthProvider>().api;
+      await api.patch('/patients/$id', {'fullName': name});
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paciente atualizado')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
+  }
+
+  void _confirmDelete(Patient patient) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir paciente'),
+        content: Text(
+          'Deseja excluir ${patient.fullName}? '
+          'Todas as sessões associadas também serão excluídas.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deletePatient(patient.id);
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePatient(String id) async {
+    try {
+      final api = context.read<AuthProvider>().api;
+      await api.delete('/patients/$id');
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paciente excluído')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
   }
 
   void _showCreateDialog(BuildContext context) {
