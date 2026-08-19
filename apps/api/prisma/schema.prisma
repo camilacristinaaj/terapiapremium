@@ -1,0 +1,120 @@
+// Modelo de dados — TerapiaPremium
+// Para ativar: npm install prisma @prisma/client && npx prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  // Registro profissional (CRP para psicólogos, CRM para médicos)
+  licenseId    String   @unique
+  role         Role     @default(PROFESSIONAL)
+  mfaEnabled   Boolean  @default(false)
+  mfaSecret    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  patients  Patient[]
+  sessions  Session[]
+  auditLogs AuditLog[]
+}
+
+enum Role {
+  ADMIN
+  PROFESSIONAL
+}
+
+model Patient {
+  id           String   @id @default(uuid())
+  fullName     String
+  birthDate    DateTime?
+  professional User     @relation(fields: [professionalId], references: [id])
+  professionalId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  consents Consent[]
+  sessions Session[]
+}
+
+// Consentimento LGPD — específico e destacado (art. 8º e 11)
+model Consent {
+  id            String       @id @default(uuid())
+  patient       Patient      @relation(fields: [patientId], references: [id])
+  patientId     String
+  purpose       ConsentPurpose
+  termVersion   String
+  grantedAt     DateTime     @default(now())
+  revokedAt     DateTime?
+  deviceInfo    String?
+}
+
+enum ConsentPurpose {
+  AUDIO_RECORDING
+  TRANSCRIPTION
+}
+
+model Session {
+  id           String        @id @default(uuid())
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  patientId    String
+  professional User          @relation(fields: [professionalId], references: [id])
+  professionalId String
+  startedAt    DateTime      @default(now())
+  endedAt      DateTime?
+  status       SessionStatus @default(RECORDING)
+  notes        String?       // anotações do profissional
+
+  recordings    Recording[]
+  transcriptions Transcription[]
+}
+
+enum SessionStatus {
+  RECORDING
+  PROCESSING
+  COMPLETED
+  ARCHIVED
+}
+
+// Áudio SEMPRE criptografado (AES-256-GCM) antes de persistir
+model Recording {
+  id           String   @id @default(uuid())
+  session      Session  @relation(fields: [sessionId], references: [id])
+  sessionId    String
+  // Caminho/chave do objeto criptografado no storage — nunca áudio em claro
+  storageKey   String
+  durationSecs Int?
+  createdAt    DateTime @default(now())
+}
+
+model Transcription {
+  id             String   @id @default(uuid())
+  session        Session  @relation(fields: [sessionId], references: [id])
+  sessionId      String
+  // Texto criptografado (AES-256-GCM) — descriptografar apenas em memória
+  encryptedText  Bytes
+  language       String   @default("pt-BR")
+  engine         String   @default("whisper-local")
+  createdAt      DateTime @default(now())
+}
+
+// Auditoria de acesso a dados clínicos (LGPD art. 46)
+model AuditLog {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  action     String   // ex.: SESSION_VIEW, TRANSCRIPTION_EXPORT, CONSENT_REVOKE
+  resourceId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
