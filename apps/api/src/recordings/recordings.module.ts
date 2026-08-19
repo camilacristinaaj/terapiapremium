@@ -12,6 +12,10 @@ import { TranscriptionProcessor } from './transcription.processor';
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        retryStrategy: (times: number) => Math.min(times * 50, 2000),
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: true,
       },
     }),
     BullModule.registerQueue({ name: 'transcription' }),
