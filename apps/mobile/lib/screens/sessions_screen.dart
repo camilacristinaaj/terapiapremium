@@ -88,29 +88,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                                     ? const Icon(Icons.check_circle,
                                         color: Colors.green)
                                     : const Icon(Icons.mic, color: Colors.teal),
-                                onTap: () {
-                                  if (s.status == 'COMPLETED') {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => TranscriptionScreen(
-                                          sessionId: s.id,
-                                          patientName: s.patientName,
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => RecordingScreen(
-                                          sessionId: s.id,
-                                          patientName: s.patientName,
-                                        ),
-                                      ),
-                                    ).then((_) => _load());
-                                  }
-                                },
+                                onTap: () => _handleSessionTap(s),
+                                onLongPress: () => _showSessionOptions(s),
                               ),
                             );
                           },
@@ -122,6 +101,157 @@ class _SessionsScreenState extends State<SessionsScreen> {
         label: const Text('Nova sessão'),
       ),
     );
+  }
+
+  void _handleSessionTap(Session s) {
+    if (s.status == 'COMPLETED') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TranscriptionScreen(
+            sessionId: s.id,
+            patientName: s.patientName,
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RecordingScreen(
+            sessionId: s.id,
+            patientName: s.patientName,
+          ),
+        ),
+      ).then((_) => _load());
+    }
+  }
+
+  void _showSessionOptions(Session s) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Editar notas'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showEditDialog(s);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Excluir sessão',
+                  style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmDelete(s);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(Session s) {
+    final notesCtrl = TextEditingController(text: s.notes ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar sessão'),
+        content: TextField(
+          controller: notesCtrl,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Notas',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _updateSession(s.id, notesCtrl.text.trim());
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateSession(String id, String notes) async {
+    try {
+      final api = context.read<AuthProvider>().api;
+      await api.patch('/sessions/$id', {'notes': notes});
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sessão atualizada')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
+  }
+
+  void _confirmDelete(Session s) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir sessão'),
+        content: Text(
+          'Deseja excluir permanentemente a sessão de ${s.patientName}? '
+          'Esta ação não pode ser desfeita e está de acordo com o direito '
+          'ao esquecimento (LGPD Art. 18, VI).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deleteSession(s.id);
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteSession(String id) async {
+    try {
+      final api = context.read<AuthProvider>().api;
+      await api.delete('/sessions/$id');
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sessão excluída')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e')),
+        );
+      }
+    }
   }
 
   void _showNewSessionDialog(BuildContext context) {

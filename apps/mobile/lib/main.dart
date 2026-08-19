@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/sessions_screen.dart';
+import 'screens/home_screen.dart';
 import 'providers/auth_provider.dart';
 
 void main() {
@@ -54,7 +54,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
         return auth.isAuthenticated
-            ? const SessionsScreen()
+            ? const HomeScreen()
             : const LoginScreen();
       },
     );

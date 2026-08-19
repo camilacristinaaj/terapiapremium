@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -55,5 +56,13 @@ export class SessionsController {
     @Body() body: { purpose: 'AUDIO_RECORDING' | 'TRANSCRIPTION' },
   ) {
     return this.sessionsService.grantConsent(id, req.user.sub, body.purpose);
+  }
+
+  @Delete(':id')
+  remove(
+    @Request() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ) {
+    return this.sessionsService.remove(id, req.user.sub);
   }
 }

@@ -78,4 +78,12 @@ export class SessionsService {
       },
     });
   }
+
+  async remove(id: string, professionalId: string) {
+    await this.findOne(id, professionalId); // garante acesso
+    // LGPD Art. 18, VI — exclusão completa
+    await this.prisma.recording.deleteMany({ where: { sessionId: id } });
+    await this.prisma.transcription.deleteMany({ where: { sessionId: id } });
+    return this.prisma.session.delete({ where: { id } });
+  }
 }

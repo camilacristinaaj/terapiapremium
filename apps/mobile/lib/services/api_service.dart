@@ -65,6 +65,11 @@ class ApiService {
     return _handleResponse(res);
   }
 
+  Future<dynamic> delete(String path) async {
+    final res = await http.delete(Uri.parse('$baseUrl$path'), headers: _headers);
+    return _handleResponse(res);
+  }
+
   Future<dynamic> uploadFile(
     String path,
     String filePath,
