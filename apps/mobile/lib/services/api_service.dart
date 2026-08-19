@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   static const String baseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'http://10.0.2.2:3000', // 10.0.2.2 = localhost do host no emulador Android
   );
 
   String? _accessToken;

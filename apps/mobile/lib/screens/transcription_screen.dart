@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../providers/auth_provider.dart';
 import '../models/models.dart';
 
@@ -44,10 +46,64 @@ class _TranscriptionScreenState extends State<TranscriptionScreen> {
     }
   }
 
+  Future<void> _exportPdf() async {
+    if (_transcription == null) return;
+
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              'TerapiaPremium — Transcrição de Sessão',
+              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 16),
+            pw.Text('Paciente: ${widget.patientName}'),
+            pw.Text(
+              'Data: ${_transcription!.createdAt.day}/${_transcription!.createdAt.month}/${_transcription!.createdAt.year}',
+            ),
+            pw.Text('Idioma: ${_transcription!.language}'),
+            pw.SizedBox(height: 24),
+            pw.Divider(),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              _transcription!.text,
+              style: const pw.TextStyle(fontSize: 12),
+            ),
+            pw.SizedBox(height: 24),
+            pw.Divider(),
+            pw.Text(
+              'Documento gerado em conformidade com a LGPD. '
+              'Dados sensíveis de saúde mental.',
+              style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) => pdf.save(),
+      name: 'transcricao_${widget.patientName}_${_transcription!.createdAt.millisecondsSinceEpoch}.pdf',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Transcrição — ${widget.patientName}')),
+      appBar: AppBar(
+        title: Text('Transcrição — ${widget.patientName}'),
+        actions: [
+          if (_transcription != null)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              onPressed: _exportPdf,
+              tooltip: 'Exportar PDF',
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
