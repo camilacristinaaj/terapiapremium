@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { CryptoModule } from '../crypto/crypto.module';
 import { RecordingsController } from './recordings.controller';
 import { RecordingsService } from './recordings.service';
 import { TranscriptionProcessor } from './transcription.processor';
 
 @Module({
   imports: [
+    CryptoModule,
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
